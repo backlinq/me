@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Backlink Showcase</title>
+  <style>
+    body {
+      background: #fff;
+      color: #222;
+      font-family: 'Fira Mono', 'Consolas', 'Menlo', 'Monaco', monospace;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .links-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.1em;
+      width: 100%;
+      margin-top: 2.5em; /* push links down from very top */
+    }
+    .link1 { /* Green */
+      font-size: 2.2em;
+      color: #1c7c1c;
+      font-weight: bold;
+      text-decoration: none;
+      word-break: break-all;
+      order: 2;
+    }
+    .link2 { /* Blue */
+      font-size: 1.5em;
+      color: #1761a0;
+      font-weight: bold;
+      text-decoration: none;
+      word-break: break-all;
+      order: 3;
+    }
+    .link3 { /* Gold */
+      font-size: 1em;
+      color: #b29a13;
+      font-weight: bold;
+      text-decoration: none;
+      word-break: break-all;
+      order: 1;
+    }
+    .link4 { /* Light Pink */
+      font-size: 0.85em;
+      color: #FFC5D3;
+      font-weight: bold;
+      text-decoration: none;
+      word-break: break-all;
+      letter-spacing: 0.5px;
+      opacity: 0.95;
+      transition: color 0.2s;
+      order: 4;
+    }
+    .link4:hover {
+      color: #FFB6C1;
+    }
+  </style>
+</head>
+<body>
+  <div class="links-section">
+    <a class="link1" href="https://example.com/green" target="_blank">https://example.com/green</a>
+    <a class="link2" href="https://example.com/blue" target="_blank">https://example.com/blue</a>
+    <a class="link3" href="https://example.com/yellow" target="_blank">https://example.com/yellow</a>
+    <a class="link4" href="https://yourdomain.com/thispage.html" target="_blank">https://yourdomain.com/thispage.html</a>
+  </div>
+</body>
+</html>
