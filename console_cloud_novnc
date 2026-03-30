@@ -1,4 +1,3 @@
-cat > ~/quick-ubuntu.sh << 'EOF'
 #!/bin/bash
 
 # Colors for output
@@ -294,7 +293,3 @@ echo ""
 echo -e "${YELLOW}💡 Tip: RustDesk now starts automatically on boot.${NC}"
 echo -e "${YELLOW}💡 If Docker permission issues occur, log out and back in.${NC}"
 echo -e "${GREEN}==========================================${NC}"
-EOF
-
-chmod +x ~/quick-ubuntu.sh
-sudo mv ~/quick-ubuntu.sh /usr/local/bin/ubuntu-setup
