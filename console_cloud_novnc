@@ -293,4 +293,3 @@ echo ""
 echo -e "${YELLOW}💡 Tip: RustDesk now starts automatically on boot.${NC}"
 echo -e "${YELLOW}💡 If Docker permission issues occur, log out and back in.${NC}"
 echo -e "${GREEN}==========================================${NC}"
-xD
