@@ -448,7 +448,3 @@ echo -e "   4. Or use: cargo new myproject && cd myproject && cargo run"
 echo ""
 echo -e "${YELLOW}💡 RustDesk starts automatically on boot${NC}"
 echo -e "${GREEN}==========================================${NC}"
-EOF
-
-chmod +x ~/quick-ubuntu.sh
-sudo mv ~/quick-ubuntu.sh /usr/local/bin/ubuntu-setup
