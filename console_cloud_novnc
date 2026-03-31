@@ -8,7 +8,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 echo -e "${GREEN}==========================================${NC}"
-echo -e "${GREEN}🚀 Ubuntu noVNC Setup — Simplified & Fast${NC}"
+echo -e "${GREEN}Ubuntu noVNC Setup -- Simplified & Fast${NC}"
 echo -e "${GREEN}==========================================${NC}"
 
 # ──────────────────────────────────────────
@@ -23,7 +23,7 @@ get_system_resources() {
     CONTAINER_RAM=$(( TOTAL_RAM * 70 / 100 ))
     [ "$CONTAINER_RAM" -lt 2048 ] && CONTAINER_RAM=2048
 
-    echo -e "${GREEN}📊 System Resources Detected:${NC}"
+    echo -e "${GREEN}System Resources Detected:${NC}"
     echo "   Total CPU cores  : $TOTAL_CPUS"
     echo "   Container CPUs   : $CONTAINER_CPUS"
     echo "   Total RAM        : $TOTAL_RAM MB"
@@ -34,19 +34,19 @@ get_system_resources() {
 # STEP 2: Wait for container
 # ──────────────────────────────────────────
 wait_for_container() {
-    echo -e "${YELLOW}⏳ Waiting for container to be ready...${NC}"
+    echo -e "${YELLOW}Waiting for container to be ready...${NC}"
     local max_attempts=30
     local attempt=0
     while [ $attempt -lt $max_attempts ]; do
         if docker exec ubuntu-novnc pgrep -f "Xvfb|openbox" > /dev/null 2>&1; then
-            echo -e "${GREEN}✅ Container is ready!${NC}"
+            echo -e "${GREEN}Container is ready!${NC}"
             return 0
         fi
         attempt=$((attempt + 1))
         echo -n "."
         sleep 2
     done
-    echo -e "${YELLOW}⚠️  Container ready check timed out, continuing anyway...${NC}"
+    echo -e "${YELLOW}Container ready check timed out, continuing anyway...${NC}"
 }
 
 # ──────────────────────────────────────────
@@ -55,26 +55,26 @@ wait_for_container() {
 get_system_resources
 
 # Check Docker
-echo -e "${YELLOW}📦 Checking Docker installation...${NC}"
+echo -e "${YELLOW}Checking Docker installation...${NC}"
 if ! command -v docker &> /dev/null; then
-    echo -e "${YELLOW}📦 Installing Docker...${NC}"
+    echo -e "${YELLOW}Installing Docker...${NC}"
     sudo apt update -y
     sudo apt install -y docker.io
     sudo usermod -aG docker $USER
-    echo -e "${GREEN}✅ Docker installed.${NC}"
-    echo -e "${YELLOW}⚠️  Please log out and back in, then run this script again.${NC}"
+    echo -e "${GREEN}Docker installed.${NC}"
+    echo -e "${YELLOW}Please log out and back in, then run this script again.${NC}"
     exit 0
 fi
 
 # Remove old container if exists
 if docker ps -a | grep -q ubuntu-novnc; then
-    echo -e "${YELLOW}🔄 Removing existing container...${NC}"
+    echo -e "${YELLOW}Removing existing container...${NC}"
     docker stop ubuntu-novnc 2>/dev/null
     docker rm ubuntu-novnc 2>/dev/null
 fi
 
 # Start container
-echo -e "${YELLOW}📦 Starting container (${CONTAINER_CPUS} CPUs / ${CONTAINER_RAM}MB RAM)...${NC}"
+echo -e "${YELLOW}Starting container (${CONTAINER_CPUS} CPUs / ${CONTAINER_RAM}MB RAM)...${NC}"
 docker run -d \
   -p 8080:80 \
   -v ~/my-desktop-data:/shareVolume \
@@ -91,7 +91,7 @@ wait_for_container
 # ──────────────────────────────────────────
 # Configure apt sources
 # ──────────────────────────────────────────
-echo -e "${YELLOW}🔧 Configuring apt sources...${NC}"
+echo -e "${YELLOW}Configuring apt sources...${NC}"
 docker exec ubuntu-novnc bash -c "
   set -e
   rm -f /etc/apt/sources.list.d/google-chrome.list*
@@ -106,13 +106,13 @@ deb http://security.ubuntu.com/ubuntu \$CODENAME-security main restricted univer
 SOURCES
 
   apt update -y
-  echo '✅ Apt sources configured'
+  echo 'Apt sources configured'
 "
 
 # ──────────────────────────────────────────
 # Install base packages
 # ──────────────────────────────────────────
-echo -e "${YELLOW}📥 Installing base packages...${NC}"
+echo -e "${YELLOW}Installing base packages...${NC}"
 docker exec ubuntu-novnc bash -c "
   rm -f /etc/apt/sources.list.d/google-chrome.list*
 
@@ -120,16 +120,16 @@ docker exec ubuntu-novnc bash -c "
   DEBIAN_FRONTEND=noninteractive apt install -y \
     firefox konsole neofetch python3-tk python3-pip \
     xclip mousepad dbus-x11 libgtk-3-0 \
-    file-roller build-essential curl wget git
+    file-roller curl wget build-essential
 
   pip3 install --user pyte
-  echo '✅ Base packages installed (including build tools)'
+  echo 'Base packages installed'
 "
 
 # ──────────────────────────────────────────
 # Install Rust
 # ──────────────────────────────────────────
-echo -e "${YELLOW}🦀 Installing Rust...${NC}"
+echo -e "${YELLOW}Installing Rust...${NC}"
 docker exec ubuntu-novnc bash -c "
   # Install Rust using rustup
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -137,231 +137,243 @@ docker exec ubuntu-novnc bash -c "
   # Add cargo to PATH for current session
   source \$HOME/.cargo/env
   
-  # Install common Rust tools
-  /root/.cargo/bin/rustup component add rustfmt clippy
-  /root/.cargo/bin/cargo install cargo-edit cargo-watch
+  # Add Rust to PATH permanently
+  echo 'export PATH=\$PATH:\$HOME/.cargo/bin' >> /root/.bashrc
+  echo 'export PATH=\$PATH:\$HOME/.cargo/bin' >> /root/.profile
   
-  echo '✅ Rust installed successfully'
+  echo 'Rust installed successfully'
 "
 
 # ──────────────────────────────────────────
-# Create Rust examples and desktop shortcuts
+# Install Windows cross-compilation support
 # ──────────────────────────────────────────
-echo -e "${YELLOW}📁 Setting up Rust workspace...${NC}"
+echo -e "${YELLOW}Setting up Windows cross-compilation...${NC}"
 docker exec ubuntu-novnc bash -c "
-  # Create Rust projects directory
-  mkdir -p /root/rust-projects
+  source \$HOME/.cargo/env
   
-  # Create a hello world example
-  cat > /root/rust-projects/hello.rs << 'RUSTCODE'
-fn main() {
-    println!(\"Hello, Rust from noVNC!\");
-    println!(\"Rust is now fully installed and ready to use!\");
-}
-RUSTCODE
-
-  # Create a slightly more advanced example
-  cat > /root/rust-projects/greeting.rs << 'RUSTCODE'
-use std::io;
-
-fn main() {
-    println!(\"What's your name?\");
-    
-    let mut name = String::new();
-    io::stdin()
-        .read_line(&mut name)
-        .expect(\"Failed to read line\");
-    
-    let name = name.trim();
-    
-    if name.is_empty() {
-        println!(\"Hello, anonymous Rustacean! 🦀\");
-    } else {
-        println!(\"Hello, {}! Welcome to Rust programming!\", name);
-    }
-}
-RUSTCODE
-
-  # Create a simple web server example
-  cat > /root/rust-projects/simple_server.rs << 'RUSTCODE'
-use std::net::{TcpListener, TcpStream};
-use std::io::prelude::*;
-use std::fs;
-
-fn main() {
-    let listener = TcpListener::bind(\"127.0.0.1:7878\").unwrap();
-    println!(\"Server running on http://127.0.0.1:7878\");
-    
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-        handle_connection(stream);
-    }
-}
-
-fn handle_connection(mut stream: TcpStream) {
-    let mut buffer = [0; 1024];
-    stream.read(&mut buffer).unwrap();
-    
-    let get = b\"GET / HTTP/1.1\\r\\n\";
-    
-    let (status_line, contents) = if buffer.starts_with(get) {
-        (\"HTTP/1.1 200 OK\", \"Hello from Rust in noVNC!\")
-    } else {
-        (\"HTTP/1.1 404 NOT FOUND\", \"404 Not Found\")
-    };
-    
-    let response = format!(
-        \"{}\\r\\nContent-Length: {}\\r\\n\\r\\n{}\",
-        status_line,
-        contents.len(),
-        contents
-    );
-    
-    stream.write(response.as_bytes()).unwrap();
-    stream.flush().unwrap();
-}
-RUSTCODE
-
-  # Create a build script
-  cat > /root/rust-projects/build_all.sh << 'SCRIPT'
-#!/bin/bash
-echo \"🦀 Building Rust examples...\"
-for file in *.rs; do
-    if [ -f \"\$file\" ]; then
-        filename=\$(basename \"\$file\" .rs)
-        echo \"Building \$filename...\"
-        rustc \"\$file\" -o \"\$filename\"
-    fi
-done
-echo \"✅ Build complete! Run with: ./<filename>\"
-SCRIPT
-  chmod +x /root/rust-projects/build_all.sh
-
-  echo '✅ Rust workspace created in /root/rust-projects/'
+  # Add Windows target for Rust
+  /root/.cargo/bin/rustup target add x86_64-pc-windows-gnu
+  
+  # Install MinGW-w64 for cross-compilation
+  DEBIAN_FRONTEND=noninteractive apt update
+  DEBIAN_FRONTEND=noninteractive apt install -y mingw-w64
+  
+  # Verify installation
+  echo 'Installed Windows targets:'
+  /root/.cargo/bin/rustc --print target-list | grep windows || echo 'Windows targets available'
+  
+  echo 'Windows cross-compilation support installed'
 "
 
 # ──────────────────────────────────────────
-# Install RustDesk (latest version)
+# Create Rust compiler GUI script
 # ──────────────────────────────────────────
-echo -e "${YELLOW}📥 Installing RustDesk (latest version)...${NC}"
+echo -e "${YELLOW}Creating Rust compiler GUI...${NC}"
+docker exec ubuntu-novnc bash -c "
+  cat > /root/Desktop/rust_compiler.py << 'PYTHON'
+#!/usr/bin/env python3
+import tkinter as tk
+from tkinter import scrolledtext, filedialog, messagebox
+import subprocess
+import os
+
+class RustCompiler:
+    def __init__(self, root):
+        self.root = root
+        self.root.title(\"Rust Compiler\")
+        self.root.geometry(\"800x600\")
+        
+        self.rustc_path = self.find_rustc()
+        
+        tk.Label(root, text=\"Rust Source Code:\", font=('Arial', 10, 'bold')).pack(anchor='w', padx=10, pady=5)
+        self.code = scrolledtext.ScrolledText(root, height=15, font=('Courier', 10))
+        self.code.pack(fill='both', expand=True, padx=10, pady=5)
+        
+        btn_frame = tk.Frame(root)
+        btn_frame.pack(pady=10)
+        
+        tk.Button(btn_frame, text=\"Compile (Linux)\", command=lambda: self.compile(\"linux\"), bg='#4CAF50', fg='white', width=15).pack(side='left', padx=5)
+        tk.Button(btn_frame, text=\"Compile (Windows EXE)\", command=lambda: self.compile(\"windows\"), bg='#2196F3', fg='white', width=18).pack(side='left', padx=5)
+        tk.Button(btn_frame, text=\"Load .rs File\", command=self.load_file, width=12).pack(side='left', padx=5)
+        tk.Button(btn_frame, text=\"Save .rs File\", command=self.save_file, width=12).pack(side='left', padx=5)
+        tk.Button(btn_frame, text=\"Clear\", command=self.clear_all, width=8).pack(side='left', padx=5)
+        
+        tk.Label(root, text=\"Output:\", font=('Arial', 10, 'bold')).pack(anchor='w', padx=10, pady=5)
+        self.output = scrolledtext.ScrolledText(root, height=12, font=('Courier', 10))
+        self.output.pack(fill='both', expand=True, padx=10, pady=5)
+        
+        self.status = tk.Label(root, text=\"Ready\", relief='sunken', anchor='w')
+        self.status.pack(fill='x', padx=10, pady=5)
+        
+        if os.path.exists('hello.rs'):
+            with open('hello.rs', 'r') as f:
+                self.code.insert('1.0', f.read())
+        
+        if not self.rustc_path:
+            self.status.config(text=\"ERROR: Rust not found\")
+    
+    def find_rustc(self):
+        try:
+            result = subprocess.run(['which', 'rustc'], capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except:
+            pass
+        
+        paths = ['/root/.cargo/bin/rustc', '/home/ubuntu/.cargo/bin/rustc', '/usr/local/bin/rustc']
+        for path in paths:
+            if os.path.exists(path):
+                return path
+        return None
+    
+    def compile(self, target):
+        if not self.rustc_path:
+            messagebox.showerror(\"Error\", \"Rust compiler not found\")
+            return
+        
+        code = self.code.get('1.0', 'end-1c')
+        if not code.strip():
+            messagebox.showerror(\"Error\", \"No code to compile\")
+            return
+        
+        if target == \"windows\":
+            filename = filedialog.asksaveasfilename(title=\"Save Windows EXE\", defaultextension=\".exe\", initialfile=\"program.exe\", filetypes=[(\"Windows Executable\", \"*.exe\"), (\"All files\", \"*.*\")])
+            if not filename:
+                return
+            cmd = [self.rustc_path, '--target', 'x86_64-pc-windows-gnu', '/tmp/temp.rs', '-o', filename]
+        else:
+            filename = filedialog.asksaveasfilename(title=\"Save Linux Binary\", defaultextension=\"\", initialfile=\"program\", filetypes=[(\"Executable\", \"*\"), (\"All files\", \"*.*\")])
+            if not filename:
+                return
+            cmd = [self.rustc_path, '/tmp/temp.rs', '-o', filename]
+        
+        self.output.delete('1.0', 'end')
+        self.output.insert('end', f\"Compiling to: {filename}\\n\" + \"-\"*50 + \"\\n\")
+        self.status.config(text=\"Compiling...\")
+        self.root.update()
+        
+        with open('/tmp/temp.rs', 'w') as f:
+            f.write(code)
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                self.output.insert('end', \"Compilation successful!\\n\")
+                self.status.config(text=f\"Binary created: {filename}\")
+                if target == \"linux\" and os.path.exists(filename):
+                    os.chmod(filename, 0o755)
+                messagebox.showinfo(\"Success\", f\"Binary saved to: {filename}\")
+            else:
+                self.output.insert('end', \"Compilation failed!\\n\" + result.stderr)
+                self.status.config(text=\"Compilation failed\")
+                messagebox.showerror(\"Error\", result.stderr)
+        except Exception as e:
+            self.output.insert('end', f\"Error: {str(e)}\\n\")
+    
+    def load_file(self):
+        filename = filedialog.askopenfilename(filetypes=[(\"Rust files\", \"*.rs\"), (\"All files\", \"*.*\")])
+        if filename:
+            with open(filename, 'r') as f:
+                self.code.delete('1.0', 'end')
+                self.code.insert('1.0', f.read())
+            self.status.config(text=f\"Loaded: {filename}\")
+    
+    def save_file(self):
+        filename = filedialog.asksaveasfilename(defaultextension=\".rs\", filetypes=[(\"Rust files\", \"*.rs\"), (\"All files\", \"*.*\")])
+        if filename:
+            with open(filename, 'w') as f:
+                f.write(self.code.get('1.0', 'end-1c'))
+            self.status.config(text=f\"Saved: {filename}\")
+    
+    def clear_all(self):
+        self.code.delete('1.0', 'end')
+        self.output.delete('1.0', 'end')
+
+if __name__ == \"__main__\":
+    root = tk.Tk()
+    app = RustCompiler(root)
+    root.mainloop()
+PYTHON
+
+  chmod +x /root/Desktop/rust_compiler.py
+"
+
+# ──────────────────────────────────────────
+# Create hello.rs example
+# ──────────────────────────────────────────
+echo -e "${YELLOW}Creating hello.rs example...${NC}"
+docker exec ubuntu-novnc bash -c "
+  cat > /root/Desktop/hello.rs << 'RUST'
+fn main() {
+    println!(\"Hello, World from Rust!\");
+}
+RUST
+"
+
+# ──────────────────────────────────────────
+# Install RustDesk
+# ──────────────────────────────────────────
+echo -e "${YELLOW}Installing RustDesk...${NC}"
 docker exec ubuntu-novnc bash -c "
   set -e
-  echo 'Fetching latest RustDesk version...'
   VER=\$(curl -s https://api.github.com/repos/rustdesk/rustdesk/releases/latest | grep -oP '\"tag_name\": \"\K[^\"]+')
-
-  if [ -z \"\$VER\" ]; then
-    echo '⚠️  Failed to fetch RustDesk version, using fallback...'
-    VER='1.3.0'  # fallback version
-  fi
-
-  echo \"Downloading RustDesk \$VER...\"
+  [ -z \"\$VER\" ] && VER='1.3.0'
   wget -q https://github.com/rustdesk/rustdesk/releases/download/\$VER/rustdesk-\$VER-x86_64.deb -O /tmp/rustdesk.deb
-
-  echo 'Installing RustDesk...'
   DEBIAN_FRONTEND=noninteractive apt install -fy /tmp/rustdesk.deb
-
   rm -f /tmp/rustdesk.deb
-  echo \"✅ RustDesk \$VER installed successfully\"
 "
 
 # ──────────────────────────────────────────
-# Create desktop files and autostart
+# Create desktop files
 # ──────────────────────────────────────────
-echo -e "${YELLOW}🗂️  Setting up desktop and autostart...${NC}"
+echo -e "${YELLOW}Setting up desktop...${NC}"
 docker exec ubuntu-novnc bash -c "
-
   mkdir -p /root/Desktop
 
-  printf 'hello world\n' > /root/Desktop/hello.txt
-
-  # Desktop shortcuts
   cat > /root/Desktop/firefox.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
 Name=Firefox
-Comment=Web Browser
-Exec=firefox %u
+Exec=firefox
 Icon=firefox
 Terminal=false
 Type=Application
-Categories=Network;WebBrowser;
-DESK
-
-  cat > /root/Desktop/mousepad.desktop << 'DESK'
-[Desktop Entry]
-Version=1.0
-Name=Mousepad
-Comment=Text Editor
-Exec=mousepad %F
-Icon=accessories-text-editor
-Terminal=false
-Type=Application
-Categories=Utility;TextEditor;
-DESK
-
-  cat > /root/Desktop/file-roller.desktop << 'DESK'
-[Desktop Entry]
-Version=1.0
-Name=File Roller
-Comment=Archive Manager
-Exec=file-roller
-Icon=file-roller
-Terminal=false
-Type=Application
-Categories=Utility;Archiving;
 DESK
 
   cat > /root/Desktop/konsole.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
 Name=Konsole
-Comment=Terminal Emulator
 Exec=konsole
 Icon=utilities-terminal
 Terminal=false
 Type=Application
-Categories=System;TerminalEmulator;
 DESK
 
   cat > /root/Desktop/rustdesk.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
 Name=RustDesk
-Comment=Remote Desktop
 Exec=rustdesk
 Icon=rustdesk
 Terminal=false
 Type=Application
-Categories=Network;RemoteAccess;
 DESK
 
-  # Rust terminal shortcut
-  cat > /root/Desktop/rust-terminal.desktop << 'DESK'
+  cat > /root/Desktop/rust-compiler.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
-Name=Rust Terminal
-Comment=Open terminal with Rust environment
-Exec=konsole --workdir /root/rust-projects
+Name=Rust Compiler
+Exec=python3 /root/Desktop/rust_compiler.py
 Icon=utilities-terminal
 Terminal=false
 Type=Application
-Categories=Development;
 DESK
 
   chmod +x /root/Desktop/*.desktop
-  echo '✅ Desktop shortcuts created'
 
-  # === AUTOSTART ===
+  # Autostart entries
   mkdir -p /etc/xdg/autostart
-
-  cat > /etc/xdg/autostart/firefox.desktop << 'AUTO'
-[Desktop Entry]
-Type=Application
-Name=Firefox
-Exec=firefox
-X-GNOME-Autostart-enabled=true
-AUTO
-
   cat > /etc/xdg/autostart/konsole.desktop << 'AUTO'
 [Desktop Entry]
 Type=Application
@@ -377,74 +389,40 @@ Name=RustDesk
 Exec=rustdesk
 X-GNOME-Autostart-enabled=true
 AUTO
-
-  cat > /etc/xdg/autostart/mousepad-hello.desktop << 'AUTO'
-[Desktop Entry]
-Type=Application
-Name=Mousepad Hello
-Exec=mousepad /root/Desktop/hello.txt
-X-GNOME-Autostart-enabled=true
-AUTO
-
-  echo '✅ Autostart entries created'
 "
 
 # ──────────────────────────────────────────
-# Configure shell environment for Rust
+# Launch apps (Firefox last)
 # ──────────────────────────────────────────
-echo -e "${YELLOW}⚙️  Configuring shell environment...${NC}"
-docker exec ubuntu-novnc bash -c "
-  # Add Rust to PATH for all users
-  echo 'export PATH=\$PATH:\$HOME/.cargo/bin' >> /root/.bashrc
-  echo 'export PATH=\$PATH:\$HOME/.cargo/bin' >> /root/.profile
-  
-  # Create an alias for easy navigation
-  echo 'alias rust-projects=\"cd /root/rust-projects && ls -la\"' >> /root/.bashrc
-  echo 'alias rust-build=\"cd /root/rust-projects && ./build_all.sh\"' >> /root/.bashrc
-  
-  echo '✅ Shell environment configured for Rust'
-"
-
-# ──────────────────────────────────────────
-# Launch apps in current session
-# ──────────────────────────────────────────
-echo -e "${YELLOW}🖥️  Launching apps in current session...${NC}"
+echo -e "${YELLOW}Launching applications...${NC}"
 docker exec ubuntu-novnc bash -c "
   export DISPLAY=:1
   sleep 3
-  firefox &
-  konsole --workdir /root/rust-projects &
+  konsole &
   rustdesk &
-  dbus-launch mousepad /root/Desktop/hello.txt &
-  echo '✅ Apps launched (including Rust environment)'
+  sleep 2
+  firefox &
 "
 
 EXTERNAL_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_VM_IP")
 
 echo -e "${GREEN}==========================================${NC}"
-echo -e "${GREEN}✅ ALL DONE!${NC}"
+echo -e "${GREEN}ALL DONE!${NC}"
 echo -e "${GREEN}==========================================${NC}"
-echo -e "   🌐 Desktop URL : ${YELLOW}http://$EXTERNAL_IP:8080${NC}"
+echo -e "   Desktop URL : ${YELLOW}http://$EXTERNAL_IP:8080${NC}"
 echo ""
-echo -e "${GREEN}📊 Resources:${NC}"
+echo -e "${GREEN}Resources:${NC}"
 echo -e "   CPUs     : ${YELLOW}$CONTAINER_CPUS${NC} of $TOTAL_CPUS"
 echo -e "   RAM      : ${YELLOW}${CONTAINER_RAM}MB${NC} of ${TOTAL_RAM}MB"
 echo ""
-echo -e "${GREEN}🦀 Rust Development Environment:${NC}"
-echo -e "   • Rust/cargo installed (via rustup)"
-echo -e "   • Example scripts in /root/rust-projects/"
-echo -e "   • Build script: ./build_all.sh"
-echo -e "   • Rust Terminal shortcut on desktop"
+echo -e "${GREEN}Installed:${NC}"
+echo -e "   • Rust with Windows cross-compilation (mingw-w64)"
+echo -e "   • Rust Compiler GUI (desktop shortcut)"
+echo -e "   • Firefox, Konsole, RustDesk"
 echo ""
-echo -e "${GREEN}📋 Installed & Auto-started:${NC}"
-echo -e "   • Firefox   • Konsole   • RustDesk   • Mousepad   • File Roller"
-echo -e "   • Rust      • Cargo     • rustfmt    • clippy"
+echo -e "${YELLOW}To compile Rust to Windows EXE:${NC}"
+echo -e "   1. Open 'Rust Compiler' from desktop"
+echo -e "   2. Click 'Compile (Windows EXE)'"
+echo -e "   3. Save the .exe file"
 echo ""
-echo -e "${YELLOW}💡 To compile Rust scripts:${NC}"
-echo -e "   1. Open terminal (Konsole)"
-echo -e "   2. cd /root/rust-projects"
-echo -e "   3. rustc hello.rs && ./hello"
-echo -e "   4. Or use: cargo new myproject && cd myproject && cargo run"
-echo ""
-echo -e "${YELLOW}💡 RustDesk starts automatically on boot${NC}"
 echo -e "${GREEN}==========================================${NC}"
