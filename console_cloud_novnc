@@ -1,4 +1,3 @@
-cat > ~/quick-ubuntu.sh << 'EOF'
 #!/bin/bash
 
 # Colors for output
