@@ -1,3 +1,4 @@
+cat > ~/quick-ubuntu.sh << 'EOF'
 #!/bin/bash
 
 # Colors for output
@@ -110,7 +111,7 @@ SOURCES
 "
 
 # ──────────────────────────────────────────
-# Install base packages + file-roller
+# Install base packages
 # ──────────────────────────────────────────
 echo -e "${YELLOW}📥 Installing base packages...${NC}"
 docker exec ubuntu-novnc bash -c "
@@ -120,10 +121,124 @@ docker exec ubuntu-novnc bash -c "
   DEBIAN_FRONTEND=noninteractive apt install -y \
     firefox konsole neofetch python3-tk python3-pip \
     xclip mousepad dbus-x11 libgtk-3-0 \
-    file-roller
+    file-roller build-essential curl wget git
 
   pip3 install --user pyte
-  echo '✅ Base packages installed (including File Roller)'
+  echo '✅ Base packages installed (including build tools)'
+"
+
+# ──────────────────────────────────────────
+# Install Rust
+# ──────────────────────────────────────────
+echo -e "${YELLOW}🦀 Installing Rust...${NC}"
+docker exec ubuntu-novnc bash -c "
+  # Install Rust using rustup
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  
+  # Add cargo to PATH for current session
+  source \$HOME/.cargo/env
+  
+  # Install common Rust tools
+  /root/.cargo/bin/rustup component add rustfmt clippy
+  /root/.cargo/bin/cargo install cargo-edit cargo-watch
+  
+  echo '✅ Rust installed successfully'
+"
+
+# ──────────────────────────────────────────
+# Create Rust examples and desktop shortcuts
+# ──────────────────────────────────────────
+echo -e "${YELLOW}📁 Setting up Rust workspace...${NC}"
+docker exec ubuntu-novnc bash -c "
+  # Create Rust projects directory
+  mkdir -p /root/rust-projects
+  
+  # Create a hello world example
+  cat > /root/rust-projects/hello.rs << 'RUSTCODE'
+fn main() {
+    println!(\"Hello, Rust from noVNC!\");
+    println!(\"Rust is now fully installed and ready to use!\");
+}
+RUSTCODE
+
+  # Create a slightly more advanced example
+  cat > /root/rust-projects/greeting.rs << 'RUSTCODE'
+use std::io;
+
+fn main() {
+    println!(\"What's your name?\");
+    
+    let mut name = String::new();
+    io::stdin()
+        .read_line(&mut name)
+        .expect(\"Failed to read line\");
+    
+    let name = name.trim();
+    
+    if name.is_empty() {
+        println!(\"Hello, anonymous Rustacean! 🦀\");
+    } else {
+        println!(\"Hello, {}! Welcome to Rust programming!\", name);
+    }
+}
+RUSTCODE
+
+  # Create a simple web server example
+  cat > /root/rust-projects/simple_server.rs << 'RUSTCODE'
+use std::net::{TcpListener, TcpStream};
+use std::io::prelude::*;
+use std::fs;
+
+fn main() {
+    let listener = TcpListener::bind(\"127.0.0.1:7878\").unwrap();
+    println!(\"Server running on http://127.0.0.1:7878\");
+    
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
+        handle_connection(stream);
+    }
+}
+
+fn handle_connection(mut stream: TcpStream) {
+    let mut buffer = [0; 1024];
+    stream.read(&mut buffer).unwrap();
+    
+    let get = b\"GET / HTTP/1.1\\r\\n\";
+    
+    let (status_line, contents) = if buffer.starts_with(get) {
+        (\"HTTP/1.1 200 OK\", \"Hello from Rust in noVNC!\")
+    } else {
+        (\"HTTP/1.1 404 NOT FOUND\", \"404 Not Found\")
+    };
+    
+    let response = format!(
+        \"{}\\r\\nContent-Length: {}\\r\\n\\r\\n{}\",
+        status_line,
+        contents.len(),
+        contents
+    );
+    
+    stream.write(response.as_bytes()).unwrap();
+    stream.flush().unwrap();
+}
+RUSTCODE
+
+  # Create a build script
+  cat > /root/rust-projects/build_all.sh << 'SCRIPT'
+#!/bin/bash
+echo \"🦀 Building Rust examples...\"
+for file in *.rs; do
+    if [ -f \"\$file\" ]; then
+        filename=\$(basename \"\$file\" .rs)
+        echo \"Building \$filename...\"
+        rustc \"\$file\" -o \"\$filename\"
+    fi
+done
+echo \"✅ Build complete! Run with: ./<filename>\"
+SCRIPT
+  chmod +x /root/rust-projects/build_all.sh
+
+  echo '✅ Rust workspace created in /root/rust-projects/'
 "
 
 # ──────────────────────────────────────────
@@ -151,7 +266,7 @@ docker exec ubuntu-novnc bash -c "
 "
 
 # ──────────────────────────────────────────
-# Create desktop files and autostart (including RustDesk)
+# Create desktop files and autostart
 # ──────────────────────────────────────────
 echo -e "${YELLOW}🗂️  Setting up desktop and autostart...${NC}"
 docker exec ubuntu-novnc bash -c "
@@ -221,10 +336,23 @@ Type=Application
 Categories=Network;RemoteAccess;
 DESK
 
+  # Rust terminal shortcut
+  cat > /root/Desktop/rust-terminal.desktop << 'DESK'
+[Desktop Entry]
+Version=1.0
+Name=Rust Terminal
+Comment=Open terminal with Rust environment
+Exec=konsole --workdir /root/rust-projects
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Development;
+DESK
+
   chmod +x /root/Desktop/*.desktop
   echo '✅ Desktop shortcuts created'
 
-  # === AUTOSTART (including RustDesk) ===
+  # === AUTOSTART ===
   mkdir -p /etc/xdg/autostart
 
   cat > /etc/xdg/autostart/firefox.desktop << 'AUTO'
@@ -259,7 +387,23 @@ Exec=mousepad /root/Desktop/hello.txt
 X-GNOME-Autostart-enabled=true
 AUTO
 
-  echo '✅ Autostart entries created (Firefox + Konsole + RustDesk + Mousepad)'
+  echo '✅ Autostart entries created'
+"
+
+# ──────────────────────────────────────────
+# Configure shell environment for Rust
+# ──────────────────────────────────────────
+echo -e "${YELLOW}⚙️  Configuring shell environment...${NC}"
+docker exec ubuntu-novnc bash -c "
+  # Add Rust to PATH for all users
+  echo 'export PATH=\$PATH:\$HOME/.cargo/bin' >> /root/.bashrc
+  echo 'export PATH=\$PATH:\$HOME/.cargo/bin' >> /root/.profile
+  
+  # Create an alias for easy navigation
+  echo 'alias rust-projects=\"cd /root/rust-projects && ls -la\"' >> /root/.bashrc
+  echo 'alias rust-build=\"cd /root/rust-projects && ./build_all.sh\"' >> /root/.bashrc
+  
+  echo '✅ Shell environment configured for Rust'
 "
 
 # ──────────────────────────────────────────
@@ -270,10 +414,10 @@ docker exec ubuntu-novnc bash -c "
   export DISPLAY=:1
   sleep 3
   firefox &
-  konsole &
+  konsole --workdir /root/rust-projects &
   rustdesk &
   dbus-launch mousepad /root/Desktop/hello.txt &
-  echo '✅ Apps launched (including RustDesk)'
+  echo '✅ Apps launched (including Rust environment)'
 "
 
 EXTERNAL_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_VM_IP")
@@ -287,10 +431,25 @@ echo -e "${GREEN}📊 Resources:${NC}"
 echo -e "   CPUs     : ${YELLOW}$CONTAINER_CPUS${NC} of $TOTAL_CPUS"
 echo -e "   RAM      : ${YELLOW}${CONTAINER_RAM}MB${NC} of ${TOTAL_RAM}MB"
 echo ""
+echo -e "${GREEN}🦀 Rust Development Environment:${NC}"
+echo -e "   • Rust/cargo installed (via rustup)"
+echo -e "   • Example scripts in /root/rust-projects/"
+echo -e "   • Build script: ./build_all.sh"
+echo -e "   • Rust Terminal shortcut on desktop"
+echo ""
 echo -e "${GREEN}📋 Installed & Auto-started:${NC}"
 echo -e "   • Firefox   • Konsole   • RustDesk   • Mousepad   • File Roller"
+echo -e "   • Rust      • Cargo     • rustfmt    • clippy"
 echo ""
-echo -e "${YELLOW}💡 Tip: RustDesk now starts automatically on boot.${NC}"
-echo -e "${YELLOW}💡 If Docker permission issues occur, log out and back in.${NC}"
+echo -e "${YELLOW}💡 To compile Rust scripts:${NC}"
+echo -e "   1. Open terminal (Konsole)"
+echo -e "   2. cd /root/rust-projects"
+echo -e "   3. rustc hello.rs && ./hello"
+echo -e "   4. Or use: cargo new myproject && cd myproject && cargo run"
+echo ""
+echo -e "${YELLOW}💡 RustDesk starts automatically on boot${NC}"
 echo -e "${GREEN}==========================================${NC}"
-xD
+EOF
+
+chmod +x ~/quick-ubuntu.sh
+sudo mv ~/quick-ubuntu.sh /usr/local/bin/ubuntu-setup
