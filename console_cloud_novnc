@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/dash
 
 # Colors for output
 RED='\033[0;31m'
@@ -7,46 +7,46 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-echo -e "${GREEN}==========================================${NC}"
-echo -e "${GREEN}Ubuntu noVNC Setup -- Simplified & Fast${NC}"
-echo -e "${GREEN}==========================================${NC}"
+echo "${GREEN}==========================================${NC}"
+echo "${GREEN}Ubuntu noVNC Setup -- Simplified & Fast (Webtop XFCE)${NC}"
+echo "${GREEN}==========================================${NC}"
 
 # ──────────────────────────────────────────
 # STEP 1: System resources
 # ──────────────────────────────────────────
 get_system_resources() {
-    TOTAL_CPUS=$(nproc)
+    TOTAL_CPUS=`nproc`
     CONTAINER_CPUS=$(( (TOTAL_CPUS * 75 + 99) / 100 ))
     [ "$CONTAINER_CPUS" -lt 1 ] && CONTAINER_CPUS=1
 
-    TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
+    TOTAL_RAM=`free -m | awk '/^Mem:/{print $2}'`
     CONTAINER_RAM=$(( TOTAL_RAM * 70 / 100 ))
     [ "$CONTAINER_RAM" -lt 2048 ] && CONTAINER_RAM=2048
 
-    echo -e "${GREEN}System Resources Detected:${NC}"
+    echo "${GREEN}System Resources Detected:${NC}"
     echo "   Total CPU cores  : $TOTAL_CPUS"
     echo "   Container CPUs   : $CONTAINER_CPUS"
     echo "   Total RAM        : $TOTAL_RAM MB"
-    echo -e "   ${YELLOW}Container RAM    : $CONTAINER_RAM MB${NC}"
+    echo "${YELLOW}Container RAM    : $CONTAINER_RAM MB${NC}"
 }
 
 # ──────────────────────────────────────────
 # STEP 2: Wait for container
 # ──────────────────────────────────────────
 wait_for_container() {
-    echo -e "${YELLOW}Waiting for container to be ready...${NC}"
-    local max_attempts=30
-    local attempt=0
+    echo "${YELLOW}Waiting for container to be ready...${NC}"
+    max_attempts=40
+    attempt=0
     while [ $attempt -lt $max_attempts ]; do
-        if docker exec ubuntu-novnc pgrep -f "Xvfb|openbox" > /dev/null 2>&1; then
-            echo -e "${GREEN}Container is ready!${NC}"
+        if docker exec ubuntu-novnc pgrep -f "xfce|xfwm|novnc" > /dev/null 2>&1; then
+            echo "${GREEN}Container is ready!${NC}"
             return 0
         fi
         attempt=$((attempt + 1))
         echo -n "."
-        sleep 2
+        sleep 3
     done
-    echo -e "${YELLOW}Container ready check timed out, continuing anyway...${NC}"
+    echo "${YELLOW}Container ready check timed out, continuing anyway...${NC}"
 }
 
 # ──────────────────────────────────────────
@@ -55,108 +55,84 @@ wait_for_container() {
 get_system_resources
 
 # Check Docker
-echo -e "${YELLOW}Checking Docker installation...${NC}"
-if ! command -v docker &> /dev/null; then
-    echo -e "${YELLOW}Installing Docker...${NC}"
-    sudo apt update -y
-    sudo apt install -y docker.io
-    sudo usermod -aG docker $USER
-    echo -e "${GREEN}Docker installed.${NC}"
-    echo -e "${YELLOW}Please log out and back in, then run this script again.${NC}"
+echo "${YELLOW}Checking Docker installation...${NC}"
+if ! command -v docker > /dev/null 2>&1; then
+    echo "${YELLOW}Installing Docker...${NC}"
+    apt update -y
+    apt install -y docker.io
+    usermod -aG docker "$USER"
+    echo "${GREEN}Docker installed.${NC}"
+    echo "${YELLOW}Please log out and back in, then run this script again.${NC}"
     exit 0
 fi
 
 # Remove old container if exists
 if docker ps -a | grep -q ubuntu-novnc; then
-    echo -e "${YELLOW}Removing existing container...${NC}"
+    echo "${YELLOW}Removing existing container...${NC}"
     docker stop ubuntu-novnc 2>/dev/null
     docker rm ubuntu-novnc 2>/dev/null
 fi
 
-# Start container
-echo -e "${YELLOW}Starting container (${CONTAINER_CPUS} CPUs / ${CONTAINER_RAM}MB RAM)...${NC}"
+# Start new Webtop container
+echo "${YELLOW}Starting Webtop Ubuntu XFCE container (${CONTAINER_CPUS} CPUs / ${CONTAINER_RAM}MB RAM)...${NC}"
 docker run -d \
-  -p 8080:80 \
-  -v ~/my-desktop-data:/shareVolume \
-  -v /dev/shm:/dev/shm \
+  -p 8080:3000 \
+  -v ~/my-desktop-data:/config \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=Etc/UTC \
   --name ubuntu-novnc \
   --restart unless-stopped \
   --cpus="$CONTAINER_CPUS" \
   --memory="${CONTAINER_RAM}m" \
   --memory-swap="${CONTAINER_RAM}m" \
-  wenoptics/ubuntu-desktop-novnc
+  lscr.io/linuxserver/webtop:ubuntu-xfce
 
 wait_for_container
 
 # ──────────────────────────────────────────
-# Configure apt sources
+# Configure apt sources + Base packages
 # ──────────────────────────────────────────
-echo -e "${YELLOW}Configuring apt sources...${NC}"
-docker exec ubuntu-novnc bash -c "
+echo "${YELLOW}Installing base packages...${NC}"
+docker exec ubuntu-novnc sh -c "
   set -e
-  rm -f /etc/apt/sources.list.d/google-chrome.list*
-
-  CODENAME=\$(lsb_release -cs)
-
-  cat > /etc/apt/sources.list << SOURCES
-deb http://archive.ubuntu.com/ubuntu \$CODENAME           main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu \$CODENAME-updates   main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu \$CODENAME-backports main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu \$CODENAME-security main restricted universe multiverse
-SOURCES
-
   apt update -y
-  echo 'Apt sources configured'
-"
-
-# ──────────────────────────────────────────
-# Install base packages
-# ──────────────────────────────────────────
-echo -e "${YELLOW}Installing base packages...${NC}"
-docker exec ubuntu-novnc bash -c "
-  rm -f /etc/apt/sources.list.d/google-chrome.list*
-
   DEBIAN_FRONTEND=noninteractive apt upgrade -y
   DEBIAN_FRONTEND=noninteractive apt install -y \
     firefox konsole neofetch python3-tk python3-pip \
     xclip mousepad dbus-x11 libgtk-3-0 \
     file-roller curl wget build-essential
-
   pip3 install --user pyte
   echo 'Base packages installed'
 "
 
-# ──────────────────────────────────────────
-# OPTIONAL: Install Code Editors (VS Code + Sublime Text + Geany)
-# ──────────────────────────────────────────
-# You can comment out the entire block below if you don't need these editors
+# ==================================================================
+# OPTIONAL PROGRAMS - EASY TO ENABLE/DISABLE WITH #
+# ==================================================================
 
-echo -e "${YELLOW}Installing Code Editors (VS Code, Sublime Text, Geany)...${NC}"
-echo -e "${YELLOW}→ Comment out this whole section when not needed.${NC}"
+# ==================== CODE EDITORS (VS Code + Sublime Text + Geany) ====================
+# Remove the # below to install Code Editors
 
-docker exec ubuntu-novnc bash -c "
+# echo "${YELLOW}Installing Code Editors (VS Code, Sublime Text, Geany)...${NC}"
+docker exec ubuntu-novnc sh -c "
   set -e
-
   add-apt-repository --remove ppa:webupd8team/brackets 2>/dev/null || true
 
-  # VS Code repository
   wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
   add-apt-repository -y \"deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main\"
 
-  # Sublime Text repository
   wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | apt-key add -
   add-apt-repository -y \"deb https://download.sublimetext.com/ apt/stable/\"
 
   apt update -y
   DEBIAN_FRONTEND=noninteractive apt install -y code sublime-text geany
-
   echo 'Code editors installed'
 "
 
 # VS Code extensions
-echo -e "${YELLOW}Installing VS Code extensions...${NC}"
-docker exec ubuntu-novnc bash -c "
-  if command -v code &> /dev/null; then
+# echo "${YELLOW}Installing VS Code extensions...${NC}"
+docker exec ubuntu-novnc sh -c "
+  if command -v code > /dev/null 2>&1; then
     code --no-sandbox --user-data-dir=/root/.vscode-root \
       --install-extension formulahendry.code-runner \
       --install-extension ms-python.python \
@@ -165,38 +141,49 @@ docker exec ubuntu-novnc bash -c "
   fi
 "
 
-# ──────────────────────────────────────────
-# Install Password Managers: Bitwarden + Proton Pass (Latest)
-# ──────────────────────────────────────────
-echo -e "${YELLOW}Installing Bitwarden and Proton Pass (latest versions)...${NC}"
 
-docker exec ubuntu-novnc bash -c "
+# ==================== PASSWORD MANAGERS (Bitwarden + Proton Pass) ====================
+# Remove the # below to install Bitwarden and Proton Pass
+
+# echo "${YELLOW}Installing Bitwarden and Proton Pass (latest versions)...${NC}"
+docker exec ubuntu-novnc sh -c "
   set -e
   cd /tmp
 
-  # Bitwarden - Official latest .deb
   echo 'Downloading latest Bitwarden...'
   wget -q -O bitwarden.deb \"https://bitwarden.com/download/?app=desktop&platform=linux&variant=deb\"
   DEBIAN_FRONTEND=noninteractive apt install -fy ./bitwarden.deb
   rm -f bitwarden.deb
 
-  # Proton Pass - Official latest .deb (always fetches current version)
   echo 'Downloading latest Proton Pass...'
   wget -q -O proton-pass.deb \"https://proton.me/download/PassDesktop/linux/x64/ProtonPass.deb\"
   DEBIAN_FRONTEND=noninteractive apt install -fy ./proton-pass.deb
   rm -f proton-pass.deb
 
-  echo 'Bitwarden and Proton Pass installed successfully'
+  echo 'Bitwarden and Proton Pass installed'
+"
+
+
+# ──────────────────────────────────────────
+# Install RustDesk (Always installed)
+# ──────────────────────────────────────────
+echo "${YELLOW}Installing RustDesk...${NC}"
+docker exec ubuntu-novnc sh -c "
+  set -e
+  VER=\`curl -s https://api.github.com/repos/rustdesk/rustdesk/releases/latest | grep -oP '\"tag_name\": \"\K[^\"]+'\`
+  [ -z \"\$VER\" ] && VER='1.3.0'
+  wget -q https://github.com/rustdesk/rustdesk/releases/download/\$VER/rustdesk-\$VER-x86_64.deb -O /tmp/rustdesk.deb
+  DEBIAN_FRONTEND=noninteractive apt install -fy /tmp/rustdesk.deb
+  rm -f /tmp/rustdesk.deb
 "
 
 # ──────────────────────────────────────────
 # Create desktop files
 # ──────────────────────────────────────────
-echo -e "${YELLOW}Setting up desktop shortcuts...${NC}"
-docker exec ubuntu-novnc bash -c "
+echo "${YELLOW}Setting up desktop shortcuts...${NC}"
+docker exec ubuntu-novnc sh -c "
   mkdir -p /root/Desktop
 
-  # Firefox
   cat > /root/Desktop/firefox.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
@@ -207,7 +194,6 @@ Terminal=false
 Type=Application
 DESK
 
-  # Konsole
   cat > /root/Desktop/konsole.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
@@ -218,7 +204,6 @@ Terminal=false
 Type=Application
 DESK
 
-  # RustDesk
   cat > /root/Desktop/rustdesk.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
@@ -229,7 +214,6 @@ Terminal=false
 Type=Application
 DESK
 
-  # Visual Studio Code
   cat > /root/Desktop/vscode.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
@@ -240,7 +224,6 @@ Terminal=false
 Type=Application
 DESK
 
-  # Bitwarden
   cat > /root/Desktop/bitwarden.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
@@ -251,7 +234,6 @@ Terminal=false
 Type=Application
 DESK
 
-  # Proton Pass
   cat > /root/Desktop/proton-pass.desktop << 'DESK'
 [Desktop Entry]
 Version=1.0
@@ -264,7 +246,6 @@ DESK
 
   chmod +x /root/Desktop/*.desktop
 
-  # Autostart
   mkdir -p /etc/xdg/autostart
   cat > /etc/xdg/autostart/konsole.desktop << 'AUTO'
 [Desktop Entry]
@@ -286,35 +267,26 @@ AUTO
 # ──────────────────────────────────────────
 # Launch apps
 # ──────────────────────────────────────────
-echo -e "${YELLOW}Launching applications...${NC}"
-docker exec ubuntu-novnc bash -c "
+echo "${YELLOW}Launching applications...${NC}"
+docker exec ubuntu-novnc sh -c "
   export DISPLAY=:1
-  sleep 3
+  sleep 5
   konsole &
   rustdesk &
-  sleep 2
+  sleep 3
   firefox &
 "
 
-EXTERNAL_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_VM_IP")
+EXTERNAL_IP=`curl -s ifconfig.me 2>/dev/null || echo "YOUR_VM_IP"`
 
-echo -e "${GREEN}==========================================${NC}"
-echo -e "${GREEN}ALL DONE!${NC}"
-echo -e "${GREEN}==========================================${NC}"
-echo -e "   Desktop URL : ${YELLOW}http://$EXTERNAL_IP:8080${NC}"
+echo "${GREEN}==========================================${NC}"
+echo "${GREEN}ALL DONE!${NC}"
+echo "${GREEN}==========================================${NC}"
+echo "   Desktop URL : ${YELLOW}http://$EXTERNAL_IP:8080${NC}"
 echo ""
-echo -e "${GREEN}Resources:${NC}"
-echo -e "   CPUs     : ${YELLOW}$CONTAINER_CPUS${NC} of $TOTAL_CPUS"
-echo -e "   RAM      : ${YELLOW}${CONTAINER_RAM}MB${NC} of ${TOTAL_RAM}MB"
+echo "${GREEN}Core Installed:${NC}"
+echo "   • Firefox, Konsole, RustDesk"
 echo ""
-echo -e "${GREEN}Installed:${NC}"
-echo -e "   • Firefox, Konsole, RustDesk"
-echo -e "   • VS Code + extensions (optional)"
-echo -e "   • Sublime Text, Geany (optional)"
-echo -e "   • Bitwarden (latest)"
-echo -e "   • Proton Pass (latest)"
+echo "${YELLOW}Tip:${NC} Remove the '#' from the lines under CODE EDITORS or PASSWORD MANAGERS to enable optional programs."
 echo ""
-echo -e "${YELLOW}Desktop Shortcuts created for:${NC}"
-echo -e "   Firefox | Konsole | RustDesk | VS Code | Bitwarden | Proton Pass"
-echo ""
-echo -e "${GREEN}==========================================${NC}"
+echo "${GREEN}==========================================${NC}"
